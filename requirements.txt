@@ -1,0 +1,4 @@
+zhipuai
+httpx
+sniffio
+pymupdf
