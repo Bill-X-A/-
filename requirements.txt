@@ -1,4 +1,5 @@
 zhipuai
 httpx
 sniffio
-pymupdf
+sentence-transformers
+faiss-cpu
