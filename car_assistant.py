@@ -5,6 +5,11 @@ import faiss
 import json
 import numpy as np
 
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = [
+        {"role": "system", "content": "你是一个专业的选车顾问，根据提供的车型资料回答用户问题，给出具体推荐理由。"}
+    ]
+
 client = ZhipuAI(api_key=st.secrets["ZHIPU_API_KEY"])
 
 # 加载向量库和原始资料
@@ -37,18 +42,23 @@ if st.button("提问"):
             context = "\n\n".join(relevant_chunks)
             
             # 4. 把相关资料 + 问题发给AI
+            st.session_state.chat_history.append(
+                    {"role": "user", "content": f"""车型资料：
+                            {context}
+
+                            用户问题：{user_question}
+
+                            请基于以上资料回答，如果资料中没有合适的车型，请诚实告知。"""}                                          
+                                        )
             response = client.chat.completions.create(
                 model="glm-4-flash",
-                messages=[
-                    {"role": "system", "content": "你是一个专业的选车顾问，根据提供的车型资料回答用户问题，给出具体推荐理由。"},
-                    {"role": "user", "content": f"""车型资料：
-{context}
+                messages=st.session_state.chat_history)
+            result = response.choices[0].message.content
+            st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": result
+                })
+            st.write(result)
 
-用户问题：{user_question}
-
-请基于以上资料回答，如果资料中没有合适的车型，请诚实告知。"""}
-                ]
-            )
-            st.write(response.choices[0].message.content)
     else:
         st.warning("请先输入问题")
