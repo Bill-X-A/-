@@ -32,7 +32,10 @@ if st.button("提问"):
     if user_question:
         with st.spinner("正在思考..."):
             # 1. 把问题转成向量
-            question_vector = model.encode([user_question])
+            # 把历史对话中用户问过的问题拼起来，一起用于检索
+            previous_questions = " ".join([msg["content"] for msg in st.session_state.chat_history if msg["role"] == "user"])
+            search_query = previous_questions + " " + user_question
+            question_vector = model.encode([search_query])
             
             # 2. 在向量库里搜索最相关的2段资料
             distances, indices = index.search(np.array(question_vector), k=2)
