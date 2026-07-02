@@ -31,37 +31,56 @@ user_question = st.text_input("你想了解什么？", placeholder="比如：预
 if st.button("提问"):
     if user_question:
         with st.spinner("正在思考..."):
-            # 1. 把问题转成向量
-            # 把历史对话中用户问过的问题拼起来，一起用于检索
-            previous_questions = " ".join([msg["content"] for msg in st.session_state.chat_history if msg["role"] == "user"])
-            search_query = previous_questions + " " + user_question
-            question_vector = model.encode([search_query])
-            
-            # 2. 在向量库里搜索最相关的2段资料
-            distances, indices = index.search(np.array(question_vector), k=2)
-            
-            # 3. 取出相关的原始文字
-            relevant_chunks = [chunks[i] for i in indices[0]]
-            context = "\n\n".join(relevant_chunks)
-            
-            # 4. 把相关资料 + 问题发给AI
-            st.session_state.chat_history.append(
-                    {"role": "user", "content": f"""车型资料：
-                            {context}
-
-                            用户问题：{user_question}
-
-                            请基于以上资料回答，如果资料中没有合适的车型，请诚实告知。"""}                                          
-                                        )
-            response = client.chat.completions.create(
+            check = client.chat.completions.create(
                 model="glm-4-flash",
-                messages=st.session_state.chat_history)
-            result = response.choices[0].message.content
-            st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": result
-                })
-            st.write(result)
+                messages=[
+                    {"role": "user", "content": f"判断这句话是否是在询问车型推荐相关的问题，只回答'是'或'否':{user_question}"}
+                ]
+            )
+            need_search = check.choices[0].message.content.strip()
+            if "是" in need_search:
+                # 1. 把问题转成向量
+                # 把历史对话中用户问过的问题拼起来，一起用于检索
+                previous_questions = " ".join([msg["content"] for msg in st.session_state.chat_history if msg["role"] == "user"])
+                search_query = previous_questions + " " + user_question
+                question_vector = model.encode([search_query])
+                
+                # 2. 在向量库里搜索最相关的2段资料
+                distances, indices = index.search(np.array(question_vector), k=2)
+                
+                # 3. 取出相关的原始文字
+                relevant_chunks = [chunks[i] for i in indices[0]]
+                context = "\n\n".join(relevant_chunks)
+                
+                # 4. 把相关资料 + 问题发给AI
+                st.session_state.chat_history.append(
+                        {"role": "user", "content": f"""车型资料：
+                                {context}
+
+                                用户问题：{user_question}
+
+                                请基于以上资料回答，如果资料中没有合适的车型，请诚实告知。"""}                                          
+                                            )
+                response = client.chat.completions.create(
+                    model="glm-4-flash",
+                    messages=st.session_state.chat_history)
+                result = response.choices[0].message.content
+                st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": result
+                    })
+                st.write(result)
+            
+            else:
+                response = client.chat.completions.create(
+                    model="glm-4-flash",
+                    messages=[
+                        {"role": "system", "content": "你是可以聊天的助手，根据他的问题直接作出回答"},
+                        {"role": "user", "content": user_question}
+                        ]
+                )
+                result = response.choices[0].message.content
+                st.write(result)
 
     else:
         st.warning("请先输入问题")
